@@ -9,7 +9,9 @@
 4. 批量翻译模式：先对字幕进行压缩后，用换行符 ("\n") 拼接字幕，保证整体字符数不超过6000，再调用翻译接口，最后根据换行符拆分还原。
 5. 请求节流：全局每秒最多发送10次请求；如果请求失败，则按 0.1 秒步进增加重试等待时间（最多5秒）。
 6. 连续重复字段压缩：当一条字幕中有 3 次及以上连续相同单词时，仅保留前三次并追加省略号。
-7. 输出文件名格式为 “原文件名.chs.srt”，例如：ABC.srt → ABC.chs.srt。
+7. 根据配置决定输出格式和翻译模式：
+   - 输出模式 (OUTPUT_MODE)： 0 表示输出双语字幕（原文 + 翻译），1 表示仅输出翻译结果；
+   - 翻译模式 (TRANSLATION_MODE)： 0 表示使用批量翻译，1 表示使用逐条翻译。
 """
 
 import os
@@ -23,6 +25,14 @@ import requests
 import tkinter as tk
 from tkinter import filedialog
 import concurrent.futures
+
+# --------------------------
+# 配置自动参数（0和1代表两种选择结果）
+# --------------------------
+# OUTPUT_MODE: 0 => 双语字幕输出（原文及翻译），1 => 仅输出翻译字幕。
+OUTPUT_MODE = 0  
+# TRANSLATION_MODE: 0 => 批量翻译，1 => 逐条翻译。
+TRANSLATION_MODE = 0   
 
 CONFIG_FILENAME = "translate_srt_config.json"
 BAIDU_URL = "https://fanyi-api.baidu.com/api/trans/vip/translate"
@@ -280,25 +290,36 @@ def main():
         return
 
     print(f"共检测到 {len(subtitles)} 条字幕。")
-    print("请选择翻译模式：")
-    print("1: 逐条翻译模式（并行请求）")
-    print("2: 批量翻译模式（保证每次请求字符数不超过6000）")
-    mode = input("请输入1或2：").strip()
 
-    if mode == "1":
-        translated = translate_line_by_line(subtitles, config)
-    elif mode == "2":
+    # 根据 TRANSLATION_MODE 参数选择翻译模式：
+    #   0 => 批量翻译, 1 => 逐条翻译
+    if TRANSLATION_MODE == 0:
         translated = translate_in_batches(subtitles, config)
+    elif TRANSLATION_MODE == 1:
+        translated = translate_line_by_line(subtitles, config)
     else:
-        print("无效选项，程序退出。")
+        print("无效的翻译模式设置，程序退出。")
         return
 
     # 输出文件名格式修改为 “原文件名.chs.srt”
     base, ext = os.path.splitext(file_path)
     output_path = base + ".chs" + ext
-    with open(output_path, "w", encoding="utf-8") as f:
-        for line in translated:
-            f.write(line + "\n")
+
+    # 根据 OUTPUT_MODE 参数决定输出格式：
+    #   0 => 双语字幕（原文 + 翻译），1 => 仅翻译字幕
+    if OUTPUT_MODE == 0:
+        with open(output_path, "w", encoding="utf-8") as f:
+            for original_line, translation_line in zip(subtitles, translated):
+                f.write(original_line + "\n")
+                f.write(translation_line + "\n")
+                f.write("\n")  # 每个字幕块后添加空行作为分隔
+    elif OUTPUT_MODE == 1:
+        with open(output_path, "w", encoding="utf-8") as f:
+            for translation_line in translated:
+                f.write(translation_line + "\n")
+    else:
+        print("无效的输出模式设置，程序退出。")
+        return
 
     print("翻译完成！输出文件为：", output_path)
 
