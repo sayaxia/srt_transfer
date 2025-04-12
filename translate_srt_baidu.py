@@ -142,7 +142,7 @@ replenish_thread.start()
 def baidu_translate(text, config, from_lang="auto", to_lang="zh"):
     """
     利用百度翻译 API 翻译给定文本。
-    使用全局令牌控制请求速率，若请求失败则以 0.1 秒步进增加延时（最高 5 秒后重试）。
+    使用全局令牌控制请求速率，若请求失败则以 0.1 秒步进增加延时（最高 1 秒后重试）。
     """
     appid = config["appid"]
     secret = config["secret"]
@@ -158,7 +158,7 @@ def baidu_translate(text, config, from_lang="auto", to_lang="zh"):
         "sign": sign,
     }
     delay = 0.1
-    max_delay = 5.0
+    max_delay = 1.0
     while True:
         rate_semaphore.acquire()
         try:
